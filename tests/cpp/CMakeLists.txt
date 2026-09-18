@@ -30,6 +30,11 @@ add_subdirectory(custom_op)
 
 target_link_libraries(${TEST_TARGET_NAME} PRIVATE $<TARGET_PROPERTY:openvino::genai,LINK_LIBRARIES> gtest_main gmock_main)
 
+if(ENABLE_XGRAMMAR)
+    target_link_libraries(${TEST_TARGET_NAME} PRIVATE xgrammar)
+    target_compile_definitions(${TEST_TARGET_NAME} PRIVATE OPENVINO_GENAI_XGRAMMAR_TESTS)
+endif()
+
 # Add OpenCL support if enabled via OpenVINO configuration (consistent with main library)
 if(ENABLE_SYSTEM_OPENCL)
     find_package(OpenCL QUIET)
