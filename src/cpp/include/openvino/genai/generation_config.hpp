@@ -232,6 +232,94 @@ public:
         }
     };
 
+
+    using TokenRef = std::variant<int32_t, std::string>;
+
+    static std::string token_ref_to_json(const TokenRef& token) {
+        if (std::holds_alternative<int32_t>(token)) {
+            return std::to_string(std::get<int32_t>(token));
+        }
+        return format_for_json(std::get<std::string>(token));
+    }
+
+    static std::string token_ref_to_string(const TokenRef& token) {
+        if (std::holds_alternative<int32_t>(token)) {
+            return std::to_string(std::get<int32_t>(token));
+        }
+        return "\"" + std::get<std::string>(token) + "\"";
+    }
+
+    /**
+     * @brief Token matches exactly one tokenizer token by id or vocabulary string.
+     */
+    struct Token {
+        TokenRef token;
+
+        Token() = default;
+        explicit Token(int32_t token_id) : token(token_id) {}
+        explicit Token(const std::string& token_string) : token(token_string) {}
+        explicit Token(const char* token_string) : token(std::string(token_string)) {}
+
+        std::string to_string() const {
+            return "Token(" + token_ref_to_string(token) + ")";
+        }
+        std::string to_json() const {
+            return std::string("{\"type\": \"token\", \"token\": ") + token_ref_to_json(token) + "}";
+        }
+        bool operator==(const Token& other) const {
+            return token == other.token;
+        }
+    };
+
+    /**
+     * @brief AnyTokens matches zero or more tokenizer tokens, optionally excluding token ids or strings.
+     */
+    struct AnyTokens {
+        std::vector<TokenRef> exclude_tokens;
+        std::optional<int32_t> max_tokens;
+
+        AnyTokens() = default;
+        explicit AnyTokens(const std::vector<TokenRef>& excluded, std::optional<int32_t> max = std::nullopt)
+            : exclude_tokens(excluded), max_tokens(max) {}
+
+        std::string to_string() const {
+            std::ostringstream oss;
+            oss << "AnyTokens(exclude_tokens=[";
+            for (size_t i = 0; i < exclude_tokens.size(); ++i) {
+                oss << token_ref_to_string(exclude_tokens[i]);
+                if (i + 1 != exclude_tokens.size())
+                    oss << ", ";
+            }
+            oss << "]";
+            if (max_tokens)
+                oss << ", max_tokens=" << *max_tokens;
+            oss << ")";
+            return oss.str();
+        }
+
+        std::string to_json() const {
+            std::ostringstream oss;
+            oss << "{\"type\": \"any_tokens\"";
+            if (!exclude_tokens.empty()) {
+                oss << ", \"exclude_tokens\": [";
+                for (size_t i = 0; i < exclude_tokens.size(); ++i) {
+                    oss << token_ref_to_json(exclude_tokens[i]);
+                    if (i + 1 != exclude_tokens.size())
+                        oss << ", ";
+                }
+                oss << "]";
+            }
+            if (max_tokens)
+                oss << ", \"max_tokens\": " << *max_tokens;
+            oss << "}";
+            return oss.str();
+        }
+
+        bool operator==(const AnyTokens& other) const {
+            return exclude_tokens == other.exclude_tokens && max_tokens == other.max_tokens;
+        }
+    };
+
     /**
      * @brief QwenXMLParametersFormat instructs the generator to output an XML
      *        parameters block derived from the provided JSON schema. This is a
@@ -258,6 +346,8 @@ public:
     struct Union;
     struct Tag;
     struct TriggeredTags;
+    struct TokenTag;
+    struct TokenTriggeredTags;
     struct TagsWithSeparator;
 
     using StructuralTag = std::variant<
@@ -267,11 +357,14 @@ public:
         EBNF,
         ConstString,
         AnyText,
+        Token,
+        AnyTokens,
         QwenXMLParametersFormat,
         std::shared_ptr<Concat>,
         std::shared_ptr<Union>,
         std::shared_ptr<Tag>,
         std::shared_ptr<TriggeredTags>,
+        std::shared_ptr<TokenTriggeredTags>,
         std::shared_ptr<TagsWithSeparator>
     >;
     using CompoundGrammar = StructuralTag;
@@ -285,12 +378,15 @@ public:
                       std::is_same_v<T, ov::genai::StructuredOutputConfig::EBNF> ||
                       std::is_same_v<T, ov::genai::StructuredOutputConfig::ConstString> ||
                       std::is_same_v<T, ov::genai::StructuredOutputConfig::AnyText> ||
+                      std::is_same_v<T, ov::genai::StructuredOutputConfig::Token> ||
+                      std::is_same_v<T, ov::genai::StructuredOutputConfig::AnyTokens> ||
                       std::is_same_v<T, ov::genai::StructuredOutputConfig::QwenXMLParametersFormat>) {
             return g.to_string();
         } else if constexpr (std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::Concat>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::Union>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::Tag>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::TriggeredTags>> ||
+                             std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::TokenTriggeredTags>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::TagsWithSeparator>>) {
             return g ? g->to_string() : std::string("null");
         } else {
@@ -307,6 +403,8 @@ public:
                              std::is_same_v<T, ov::genai::StructuredOutputConfig::EBNF> ||
                              std::is_same_v<T, ov::genai::StructuredOutputConfig::ConstString> ||
                              std::is_same_v<T, ov::genai::StructuredOutputConfig::AnyText> ||
+                             std::is_same_v<T, ov::genai::StructuredOutputConfig::Token> ||
+                             std::is_same_v<T, ov::genai::StructuredOutputConfig::AnyTokens> ||
                              std::is_same_v<T, ov::genai::StructuredOutputConfig::QwenXMLParametersFormat>) {
             return g.to_json();
         } else if constexpr (std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::Concat>> ||
@@ -498,6 +596,121 @@ public:
                    ", stop_after_first=" << (stop_after_first ? "True" : "False") << ")";
             return oss.str();
         };
+    };
+
+    /**
+     * @brief TokenTag is a tag whose begin and end boundaries are tokenizer tokens.
+     *
+     * This keeps token-triggered protocols separate from string-prefix Tag semantics.
+     */
+    struct TokenTag {
+        Token begin;
+        StructuralTag content;
+        Token end;
+
+        TokenTag() = default;
+        TokenTag(Token begin, StructuralTag content, Token end)
+            : begin(std::move(begin)), content(std::move(content)), end(std::move(end)) {}
+
+        std::string to_json() const {
+            std::ostringstream oss;
+            oss << "{\"type\": \"tag\", \"begin\": " << begin.to_json()
+                << ", \"content\": "
+                << std::visit([](const auto& g) -> std::string { return structural_tag_to_json(g); }, content)
+                << ", \"end\": " << end.to_json() << "}";
+            return oss.str();
+        }
+
+        std::string to_string() const {
+            std::ostringstream oss;
+            oss << "TokenTag(begin=" << begin.to_string() << ", content="
+                << std::visit([](const auto& g) -> std::string { return structural_tag_to_string(g); }, content)
+                << ", end=" << end.to_string() << ")";
+            return oss.str();
+        }
+
+        bool operator==(const TokenTag& other) const {
+            return begin == other.begin && content == other.content && end == other.end;
+        }
+    };
+
+    /**
+     * @brief TokenTriggeredTags dispatches on tokenizer token ids or vocabulary strings.
+     */
+    struct TokenTriggeredTags {
+        std::vector<TokenRef> trigger_tokens;
+        std::vector<TokenTag> tags;
+        std::vector<TokenRef> exclude_tokens;
+        bool at_least_one = false;
+        bool stop_after_first = false;
+
+        TokenTriggeredTags() = default;
+        TokenTriggeredTags(const std::vector<TokenRef>& triggers,
+                           const std::vector<TokenTag>& tags,
+                           bool at_least_one = false,
+                           bool stop_after_first = false,
+                           const std::vector<TokenRef>& excludes = {})
+            : trigger_tokens(triggers),
+              tags(tags),
+              exclude_tokens(excludes),
+              at_least_one(at_least_one),
+              stop_after_first(stop_after_first) {}
+
+        std::string to_json() const {
+            std::ostringstream oss;
+            oss << "{\"type\": \"token_triggered_tags\", \"trigger_tokens\": [";
+            for (size_t i = 0; i < trigger_tokens.size(); ++i) {
+                oss << token_ref_to_json(trigger_tokens[i]);
+                if (i + 1 != trigger_tokens.size())
+                    oss << ", ";
+            }
+            oss << "], \"tags\": [";
+            for (size_t i = 0; i < tags.size(); ++i) {
+                oss << tags[i].to_json();
+                if (i + 1 != tags.size())
+                    oss << ", ";
+            }
+            oss << "]";
+            if (!exclude_tokens.empty()) {
+                oss << ", \"exclude_tokens\": [";
+                for (size_t i = 0; i < exclude_tokens.size(); ++i) {
+                    oss << token_ref_to_json(exclude_tokens[i]);
+                    if (i + 1 != exclude_tokens.size())
+                        oss << ", ";
+                }
+                oss << "]";
+            }
+            oss << ", \"at_least_one\": " << (at_least_one ? "true" : "false")
+                << ", \"stop_after_first\": " << (stop_after_first ? "true" : "false") << "}";
+            return oss.str();
+        }
+
+        std::string to_string() const {
+            std::ostringstream oss;
+            oss << "TokenTriggeredTags(trigger_tokens=[";
+            for (size_t i = 0; i < trigger_tokens.size(); ++i) {
+                oss << token_ref_to_string(trigger_tokens[i]);
+                if (i + 1 != trigger_tokens.size())
+                    oss << ", ";
+            }
+            oss << "], tags=[";
+            for (size_t i = 0; i < tags.size(); ++i) {
+                oss << tags[i].to_string();
+                if (i + 1 != tags.size())
+                    oss << ", ";
+            }
+            oss << "], at_least_one=" << (at_least_one ? "true" : "false")
+                << ", stop_after_first=" << (stop_after_first ? "true" : "false") << ")";
+            return oss.str();
+        }
+
+        bool operator==(const TokenTriggeredTags& other) const {
+            return trigger_tokens == other.trigger_tokens &&
+                   tags == other.tags &&
+                   exclude_tokens == other.exclude_tokens &&
+                   at_least_one == other.at_least_one &&
+                   stop_after_first == other.stop_after_first;
+        }
     };
 
     /**
