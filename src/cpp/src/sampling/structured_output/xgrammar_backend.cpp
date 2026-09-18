@@ -173,7 +173,11 @@ void XGrammarLogitsTransformer::accept_tokens(const TokenIds& input_ids) {
         if (m_grammar_matcher.IsTerminated()) {
             break;  // stop accepting tokens once the matcher has terminated (e.g., after accepting the stop token)
         }
-        m_grammar_matcher.AcceptToken(token);
+        if (!m_grammar_matcher.AcceptToken(token)) {
+            OPENVINO_THROW(
+                "XGrammar rejected a token emitted under structured generation while advancing the matcher state. token_id=",
+                token);
+        }
     }
 }
 
