@@ -84,8 +84,9 @@ public:
     void validate_grammar(const std::optional<StructuredOutputConfig>& structured_output_config) override;
 private:
     std::unique_ptr<xgrammar::GrammarCompiler> m_grammar_compiler;
+    std::optional<xgrammar::TokenizerInfo> m_tokenizer_info;
 
-    static xgrammar::Grammar parse_structural_tag(const StructuredOutputConfig::CompoundGrammar& compound_grammar);
+    xgrammar::Grammar parse_structural_tag(const StructuredOutputConfig::CompoundGrammar& compound_grammar);
     xgrammar::Grammar create_grammar(const std::optional<StructuredOutputConfig>& structured_output_config);
 };
 

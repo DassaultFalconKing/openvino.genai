@@ -28,6 +28,7 @@ XGrammarStructuredOutput::XGrammarStructuredOutput(const ov::genai::Tokenizer::T
         std::vector<int32_t>{static_cast<int32_t>(tokenizer_impl.m_eos_token_id)},
         true
     );
+    m_tokenizer_info = tokenizer_info;
     m_grammar_compiler = std::make_unique<xgrammar::GrammarCompiler>(std::move(tokenizer_info));
 }
 
@@ -46,7 +47,7 @@ xgrammar::Grammar XGrammarStructuredOutput::parse_structural_tag(const Structure
         }, compound_grammar);
         oss << "}";
     };
-    auto result = xgrammar::Grammar::FromStructuralTag(oss.str());
+    auto result = xgrammar::Grammar::FromStructuralTag(oss.str(), m_tokenizer_info);
     if (std::holds_alternative<xgrammar::Grammar>(result)) {
         return std::get<xgrammar::Grammar>(result);
     } else {
@@ -75,7 +76,7 @@ xgrammar::Grammar XGrammarStructuredOutput::create_grammar(const std::optional<S
     } else if (structured_output_config.value().grammar.has_value()) {
         return xgrammar::Grammar::FromEBNF(structured_output_config.value().grammar.value());
     } else if (structured_output_config.value().structural_tags_config.has_value()) {
-        return std::visit([](const auto& config) -> xgrammar::Grammar {
+        return std::visit([this](const auto& config) -> xgrammar::Grammar {
             using ConfigType = std::decay_t<decltype(config)>;
             if constexpr (std::is_same_v<ConfigType, StructuralTagsConfig>) {
                 // Old format: StructuralTagsConfig
@@ -85,7 +86,7 @@ xgrammar::Grammar XGrammarStructuredOutput::create_grammar(const std::optional<S
 
                 std::ostringstream oss;
                 oss << "{\"type\": \"structural_tag\", \"format\": " << config.to_json() << "}";
-                auto result = xgrammar::Grammar::FromStructuralTag(oss.str());
+                auto result = xgrammar::Grammar::FromStructuralTag(oss.str(), m_tokenizer_info);
                 if (std::holds_alternative<xgrammar::Grammar>(result)) {
                     return std::get<xgrammar::Grammar>(result);
                 } else {
