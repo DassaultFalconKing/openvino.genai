@@ -119,3 +119,62 @@ TEST(XGrammarLogitsTransformer, RejectsGeneratedTokenThatDoesNotAdvanceMatcher) 
 }
 
 #endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
+
+
+#ifdef OPENVINO_GENAI_XGRAMMAR_TESTS
+
+TEST(TypedTokenStructuralTags, SerializeAndReplayTokenTriggeredTag) {
+    using Structured = ov::genai::StructuredOutputConfig;
+
+    auto token_tags = std::make_shared<Structured::TokenTriggeredTags>();
+    token_tags->trigger_tokens = {std::string("<|tool_call>")};
+    token_tags->tags.emplace_back(
+        Structured::Token("<|tool_call>"),
+        Structured::ConstString("x"),
+        Structured::Token("<tool_call|>"));
+    token_tags->at_least_one = false;
+    token_tags->stop_after_first = true;
+
+    Structured::StructuralTag typed = token_tags;
+    const std::string format_json = std::visit(
+        [](const auto& value) { return Structured::structural_tag_to_json(value); },
+        typed);
+
+    EXPECT_NE(format_json.find("\"type\": \"token_triggered_tags\""), std::string::npos);
+    EXPECT_NE(format_json.find("\"type\": \"token\""), std::string::npos);
+
+    const std::string structural_json =
+        std::string("{\"type\":\"structural_tag\",\"format\":") + format_json + "}";
+
+    const xgrammar::TokenizerInfo tokenizer_info(
+        std::vector<std::string>{"<|tool_call>", "x", "<tool_call|>"});
+    const auto grammar = ov::genai::detail::parse_xgrammar_structural_tag_json(
+        structural_json,
+        tokenizer_info);
+
+    xgrammar::GrammarCompiler compiler(tokenizer_info, 1, false);
+    const auto compiled = compiler.CompileGrammar(grammar);
+    xgrammar::GrammarMatcher matcher(
+        compiled,
+        std::nullopt,
+        /*terminate_without_stop_token=*/true);
+
+    EXPECT_TRUE(matcher.AcceptToken(0));
+    EXPECT_TRUE(matcher.AcceptToken(1));
+    EXPECT_TRUE(matcher.AcceptToken(2));
+}
+
+TEST(TypedTokenStructuralTags, AnyTokensSerializesExclusionsAndBound) {
+    using Structured = ov::genai::StructuredOutputConfig;
+    const Structured::AnyTokens any_tokens(
+        {std::string("<bad>"), int32_t{7}},
+        int32_t{32});
+
+    const std::string json = any_tokens.to_json();
+    EXPECT_NE(json.find("\"type\": \"any_tokens\""), std::string::npos);
+    EXPECT_NE(json.find("\"<bad>\""), std::string::npos);
+    EXPECT_NE(json.find("7"), std::string::npos);
+    EXPECT_NE(json.find("\"max_tokens\": 32"), std::string::npos);
+}
+
+#endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
