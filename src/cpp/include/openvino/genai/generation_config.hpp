@@ -411,6 +411,7 @@ public:
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::Union>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::Tag>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::TriggeredTags>> ||
+                             std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::TokenTriggeredTags>> ||
                              std::is_same_v<T, std::shared_ptr<ov::genai::StructuredOutputConfig::TagsWithSeparator>>) {
             return g ? g->to_json() : std::string("null");
         } else {
