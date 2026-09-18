@@ -52,6 +52,11 @@ protected:
 
 } // namespace LogitTransformers
 
+namespace detail {
+xgrammar::Grammar parse_xgrammar_structural_tag_json(
+    const std::string& structural_tag_json,
+    const std::optional<xgrammar::TokenizerInfo>& tokenizer_info = std::nullopt);
+}  // namespace detail
 
 /**
  * @brief XGrammarStructuredOutput is a structured output implementation that uses the XGrammar backend.
