@@ -45,10 +45,14 @@ export declare namespace StructuredOutputConfig {
     | ConstString
     | AnyText
     | QwenXMLParametersFormat
+    | Token
+    | AnyTokens
     | Concat
     | Union
     | Tag
+    | TokenTag
     | TriggeredTags
+    | TokenTriggeredTags
     | TagsWithSeparator;
   /** Regex structural tag constrains output using a regular expression. */
   export type Regex = {
@@ -109,6 +113,36 @@ export declare namespace StructuredOutputConfig {
     begin: string;
     content: StructuralTag;
     end: string;
+  };
+  /** Token matches exactly one tokenizer token by id or vocabulary string. */
+  export type Token = {
+    structuralTagType: "Token";
+    token: number | string;
+  };
+  /** AnyTokens matches zero or more tokenizer tokens, optionally excluding
+   * token ids or vocabulary strings and bounding the token count. */
+  export type AnyTokens = {
+    structuralTagType: "AnyTokens";
+    excludeTokens?: (number | string)[];
+    maxTokens?: number;
+  };
+  /** TokenTag defines a token-boundary begin/end wrapper with constrained
+   * inner content. Only valid nested inside TokenTriggeredTags tags. */
+  export type TokenTag = {
+    structuralTagType: "TokenTag";
+    begin: Token;
+    content: StructuralTag;
+    end: Token;
+  };
+  /** TokenTriggeredTags dispatches on tokenizer token ids or vocabulary
+   * strings instead of plain-text triggers. */
+  export type TokenTriggeredTags = {
+    structuralTagType: "TokenTriggeredTags";
+    triggerTokens: (number | string)[];
+    tags: TokenTag[];
+    excludeTokens?: (number | string)[];
+    atLeastOne: boolean;
+    stopAfterFirst: boolean;
   };
   /** TriggeredTags associates a set of `triggers` with multiple `tags`.
    *
@@ -213,6 +247,40 @@ export class StructuredOutputConfig {
   }): StructuredOutputConfig.TriggeredTags {
     return {
       structuralTagType: "TriggeredTags",
+      ...params,
+      atLeastOne: params.atLeastOne ?? false,
+      stopAfterFirst: params.stopAfterFirst ?? false,
+    };
+  }
+
+  static Token(token: number | string): StructuredOutputConfig.Token {
+    return { structuralTagType: "Token", token };
+  }
+
+  static AnyTokens(params: {
+    excludeTokens?: (number | string)[];
+    maxTokens?: number;
+  } = {}): StructuredOutputConfig.AnyTokens {
+    return { structuralTagType: "AnyTokens", ...params };
+  }
+
+  static TokenTag(params: {
+    begin: StructuredOutputConfig.Token;
+    content: StructuredOutputConfig.StructuralTag;
+    end: StructuredOutputConfig.Token;
+  }): StructuredOutputConfig.TokenTag {
+    return { structuralTagType: "TokenTag", ...params };
+  }
+
+  static TokenTriggeredTags(params: {
+    triggerTokens: (number | string)[];
+    tags: StructuredOutputConfig.TokenTag[];
+    excludeTokens?: (number | string)[];
+    atLeastOne?: boolean;
+    stopAfterFirst?: boolean;
+  }): StructuredOutputConfig.TokenTriggeredTags {
+    return {
+      structuralTagType: "TokenTriggeredTags",
       ...params,
       atLeastOne: params.atLeastOne ?? false,
       stopAfterFirst: params.stopAfterFirst ?? false,
