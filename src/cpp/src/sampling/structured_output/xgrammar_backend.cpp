@@ -11,6 +11,26 @@
 namespace ov {
 namespace genai {
 
+xgrammar::Grammar detail::parse_xgrammar_structural_tag_json(
+    const std::string& structural_tag_json,
+    const std::optional<xgrammar::TokenizerInfo>& tokenizer_info) {
+    auto result = xgrammar::Grammar::FromStructuralTag(structural_tag_json, tokenizer_info);
+    if (std::holds_alternative<xgrammar::Grammar>(result)) {
+        return std::get<xgrammar::Grammar>(result);
+    }
+
+    const auto& error = std::get<xgrammar::StructuralTagError>(result);
+    std::string error_message;
+    std::visit([&error_message](const auto& err) {
+        if constexpr (std::is_member_function_pointer<decltype(&std::decay_t<decltype(err)>::what)>::value) {
+            error_message = err.what();
+        } else {
+            error_message = "Unknown error type";
+        }
+    }, error);
+    OPENVINO_THROW("Failed to create grammar from structural tag: " + error_message);
+}
+
 XGrammarStructuredOutput::XGrammarStructuredOutput(const ov::genai::Tokenizer::TokenizerImpl& tokenizer_impl, std::optional<int> vocab_size) {
     auto vocab_vector = tokenizer_impl.m_vocab;
     OPENVINO_ASSERT(!vocab_vector.empty(),
@@ -47,21 +67,7 @@ xgrammar::Grammar XGrammarStructuredOutput::parse_structural_tag(const Structure
         }, compound_grammar);
         oss << "}";
     };
-    auto result = xgrammar::Grammar::FromStructuralTag(oss.str(), m_tokenizer_info);
-    if (std::holds_alternative<xgrammar::Grammar>(result)) {
-        return std::get<xgrammar::Grammar>(result);
-    } else {
-        const auto& error = std::get<xgrammar::StructuralTagError>(result);
-        std::string error_message;
-        std::visit([&error_message](const auto& err) {
-            if constexpr (std::is_member_function_pointer<decltype(&std::decay_t<decltype(err)>::what)>::value) {
-                error_message = err.what();
-            } else {
-                error_message = "Unknown error type";
-            }
-        }, error);
-        OPENVINO_THROW("Failed to create grammar from structural tag: " + error_message);
-    }
+    return detail::parse_xgrammar_structural_tag_json(oss.str(), m_tokenizer_info);
 }
 
 xgrammar::Grammar XGrammarStructuredOutput::create_grammar(const std::optional<StructuredOutputConfig>& structured_output_config) {
@@ -86,21 +92,7 @@ xgrammar::Grammar XGrammarStructuredOutput::create_grammar(const std::optional<S
 
                 std::ostringstream oss;
                 oss << "{\"type\": \"structural_tag\", \"format\": " << config.to_json() << "}";
-                auto result = xgrammar::Grammar::FromStructuralTag(oss.str(), m_tokenizer_info);
-                if (std::holds_alternative<xgrammar::Grammar>(result)) {
-                    return std::get<xgrammar::Grammar>(result);
-                } else {
-                    const auto& error = std::get<xgrammar::StructuralTagError>(result);
-                    std::string error_message;
-                    std::visit([&error_message](const auto& err) {
-                        if constexpr (std::is_member_function_pointer<decltype(&std::decay_t<decltype(err)>::what)>::value) {
-                            error_message = err.what();
-                        } else {
-                            error_message = "Unknown error type";
-                        }
-                    }, error);
-                    OPENVINO_THROW("Failed to create grammar from structural tag: " + error_message);
-                }
+                return detail::parse_xgrammar_structural_tag_json(oss.str(), m_tokenizer_info);
             } else {
                 // New format: StructuralTag
                 return parse_structural_tag(config);
