@@ -5,6 +5,10 @@
 
 #include "openvino/genai/generation_config.hpp"
 
+#ifdef OPENVINO_GENAI_XGRAMMAR_TESTS
+#include "sampling/structured_output/xgrammar_backend.hpp"
+#endif
+
 using JSONSchema = ov::genai::StructuredOutputConfig::JSONSchema;
 
 TEST(StructuredOutputJSONSchema, LegacySerializationDoesNotSetWhitespaceBound) {
@@ -33,3 +37,33 @@ TEST(StructuredOutputJSONSchema, EqualityIncludesWhitespacePolicy) {
     EXPECT_FALSE(JSONSchema("{}", 1) == JSONSchema("{}", 2));
     EXPECT_FALSE(JSONSchema("{}", 2) == JSONSchema("{\"type\":\"object\"}", 2));
 }
+
+#ifdef OPENVINO_GENAI_XGRAMMAR_TESTS
+
+TEST(XGrammarLogitsTransformer, AcceptsGeneratedTokenThatAdvancesMatcher) {
+    auto tokenizer_info = xgrammar::TokenizerInfo(std::vector<std::string>{"a", "b"});
+    xgrammar::GrammarCompiler compiler(tokenizer_info, 1, false);
+    const auto compiled = compiler.CompileGrammar(xgrammar::Grammar::FromEBNF(R"(root ::= "a")"));
+
+    ov::genai::LogitTransformers::XGrammarLogitsTransformer transformer(
+        compiled,
+        std::nullopt,
+        /*terminate_without_stop_token=*/true);
+
+    EXPECT_NO_THROW(transformer.accept_tokens(ov::genai::TokenIds{0}));
+}
+
+TEST(XGrammarLogitsTransformer, RejectsGeneratedTokenThatDoesNotAdvanceMatcher) {
+    auto tokenizer_info = xgrammar::TokenizerInfo(std::vector<std::string>{"a", "b"});
+    xgrammar::GrammarCompiler compiler(tokenizer_info, 1, false);
+    const auto compiled = compiler.CompileGrammar(xgrammar::Grammar::FromEBNF(R"(root ::= "a")"));
+
+    ov::genai::LogitTransformers::XGrammarLogitsTransformer transformer(
+        compiled,
+        std::nullopt,
+        /*terminate_without_stop_token=*/true);
+
+    EXPECT_THROW(transformer.accept_tokens(ov::genai::TokenIds{1}), std::exception);
+}
+
+#endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
