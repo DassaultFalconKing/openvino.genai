@@ -10,6 +10,7 @@
 #endif
 
 using JSONSchema = ov::genai::StructuredOutputConfig::JSONSchema;
+using TokenIds = ov::genai::LogitTransformers::TokenIds;
 
 TEST(StructuredOutputJSONSchema, LegacySerializationDoesNotSetWhitespaceBound) {
     const JSONSchema schema("{}");
@@ -102,7 +103,7 @@ TEST(XGrammarLogitsTransformer, AcceptsGeneratedTokenThatAdvancesMatcher) {
         std::nullopt,
         /*terminate_without_stop_token=*/true);
 
-    EXPECT_NO_THROW(transformer.accept_tokens(ov::genai::TokenIds{0}));
+    EXPECT_NO_THROW(transformer.accept_tokens(TokenIds{0}));
 }
 
 TEST(XGrammarLogitsTransformer, RejectsGeneratedTokenThatDoesNotAdvanceMatcher) {
@@ -115,7 +116,7 @@ TEST(XGrammarLogitsTransformer, RejectsGeneratedTokenThatDoesNotAdvanceMatcher) 
         std::nullopt,
         /*terminate_without_stop_token=*/true);
 
-    EXPECT_THROW(transformer.accept_tokens(ov::genai::TokenIds{1}), std::exception);
+    EXPECT_THROW(transformer.accept_tokens(TokenIds{1}), std::exception);
 }
 
 #endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
