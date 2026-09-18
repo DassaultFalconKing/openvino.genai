@@ -5,6 +5,10 @@
 
 #include "openvino/genai/generation_config.hpp"
 
+#ifdef OPENVINO_GENAI_XGRAMMAR_TESTS
+#include "sampling/structured_output/xgrammar_backend.hpp"
+#endif
+
 using JSONSchema = ov::genai::StructuredOutputConfig::JSONSchema;
 
 TEST(StructuredOutputJSONSchema, LegacySerializationDoesNotSetWhitespaceBound) {
@@ -33,3 +37,55 @@ TEST(StructuredOutputJSONSchema, EqualityIncludesWhitespacePolicy) {
     EXPECT_FALSE(JSONSchema("{}", 1) == JSONSchema("{}", 2));
     EXPECT_FALSE(JSONSchema("{}", 2) == JSONSchema("{\"type\":\"object\"}", 2));
 }
+
+#ifdef OPENVINO_GENAI_XGRAMMAR_TESTS
+
+namespace {
+
+constexpr const char* kTokenTriggeredToolGrammar = R"({
+  "type":"structural_tag",
+  "format":{
+    "type":"token_triggered_tags",
+    "trigger_tokens":["<|tool_call>"],
+    "tags":[{
+      "type":"tag",
+      "begin":{"type":"token","token":"<|tool_call>"},
+      "content":{"type":"const_string","value":"x"},
+      "end":{"type":"token","token":"<tool_call|>"}
+    }],
+    "at_least_one":false,
+    "stop_after_first":true
+  }
+})";
+
+}  // namespace
+
+TEST(TokenAwareStructuralTagParser, ResolvesStringTokenReferencesFromTokenizerInfo) {
+    const xgrammar::TokenizerInfo tokenizer_info(
+        std::vector<std::string>{"<|tool_call>", "x", "<tool_call|>"});
+
+    const auto grammar = ov::genai::detail::parse_xgrammar_structural_tag_json(
+        kTokenTriggeredToolGrammar,
+        tokenizer_info);
+
+    xgrammar::GrammarCompiler compiler(tokenizer_info, 1, false);
+    const auto compiled = compiler.CompileGrammar(grammar);
+    xgrammar::GrammarMatcher matcher(
+        compiled,
+        std::nullopt,
+        /*terminate_without_stop_token=*/true);
+
+    EXPECT_TRUE(matcher.AcceptToken(0));
+    EXPECT_TRUE(matcher.AcceptToken(1));
+    EXPECT_TRUE(matcher.AcceptToken(2));
+}
+
+TEST(TokenAwareStructuralTagParser, RejectsStringTokenReferencesWithoutTokenizerInfo) {
+    EXPECT_THROW(
+        ov::genai::detail::parse_xgrammar_structural_tag_json(
+            kTokenTriggeredToolGrammar,
+            std::nullopt),
+        std::exception);
+}
+
+#endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
