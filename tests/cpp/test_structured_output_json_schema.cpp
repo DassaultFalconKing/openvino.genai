@@ -89,3 +89,33 @@ TEST(TokenAwareStructuralTagParser, RejectsStringTokenReferencesWithoutTokenizer
 }
 
 #endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
+
+#ifdef OPENVINO_GENAI_XGRAMMAR_TESTS
+
+TEST(XGrammarLogitsTransformer, AcceptsGeneratedTokenThatAdvancesMatcher) {
+    auto tokenizer_info = xgrammar::TokenizerInfo(std::vector<std::string>{"a", "b"});
+    xgrammar::GrammarCompiler compiler(tokenizer_info, 1, false);
+    const auto compiled = compiler.CompileGrammar(xgrammar::Grammar::FromEBNF(R"(root ::= "a")"));
+
+    ov::genai::LogitTransformers::XGrammarLogitsTransformer transformer(
+        compiled,
+        std::nullopt,
+        /*terminate_without_stop_token=*/true);
+
+    EXPECT_NO_THROW(transformer.accept_tokens(ov::genai::TokenIds{0}));
+}
+
+TEST(XGrammarLogitsTransformer, RejectsGeneratedTokenThatDoesNotAdvanceMatcher) {
+    auto tokenizer_info = xgrammar::TokenizerInfo(std::vector<std::string>{"a", "b"});
+    xgrammar::GrammarCompiler compiler(tokenizer_info, 1, false);
+    const auto compiled = compiler.CompileGrammar(xgrammar::Grammar::FromEBNF(R"(root ::= "a")"));
+
+    ov::genai::LogitTransformers::XGrammarLogitsTransformer transformer(
+        compiled,
+        std::nullopt,
+        /*terminate_without_stop_token=*/true);
+
+    EXPECT_THROW(transformer.accept_tokens(ov::genai::TokenIds{1}), std::exception);
+}
+
+#endif  // OPENVINO_GENAI_XGRAMMAR_TESTS
