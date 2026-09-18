@@ -4315,6 +4315,22 @@ class StructuredOutputConfig:
             ...
         def __repr__(self) -> str:
             ...
+    class AnyTokens:
+        """
+        
+            AnyTokens matches zero or more tokenizer tokens, optionally excluding
+            token ids or vocabulary strings and bounding the token count.
+        """
+        exclude_tokens: list[int | str]
+        max_tokens: int | None
+        def __add__(self, arg0: typing.Any) -> StructuredOutputConfig.Concat:
+            ...
+        def __init__(self, exclude_tokens: collections.abc.Sequence[int | str] = ..., max_tokens: int | None = ...) -> None:
+            ...
+        def __or__(self, arg0: typing.Any) -> StructuredOutputConfig.Union:
+            ...
+        def __repr__(self) -> str:
+            ...
     class Concat:
         """
         
@@ -4462,6 +4478,62 @@ class StructuredOutputConfig:
             ...
         @tags.setter
         def tags(self, arg0: collections.abc.Sequence[StructuredOutputConfig.Tag]) -> None:
+            ...
+    class Token:
+        """
+        
+            Token matches exactly one tokenizer token by id or vocabulary string.
+        """
+        token: int | str
+        def __add__(self, arg0: typing.Any) -> StructuredOutputConfig.Concat:
+            ...
+        @typing.overload
+        def __init__(self, token_id: int) -> None:
+            ...
+        @typing.overload
+        def __init__(self, token_string: str) -> None:
+            ...
+        def __or__(self, arg0: typing.Any) -> StructuredOutputConfig.Union:
+            ...
+        def __repr__(self) -> str:
+            ...
+    class TokenTag:
+        """
+        
+            TokenTag defines a token-boundary begin/end wrapper with constrained
+            inner content. Only valid nested inside TokenTriggeredTags tags.
+        """
+        begin: StructuredOutputConfig.Token
+        end: StructuredOutputConfig.Token
+        def __init__(self, begin: StructuredOutputConfig.Token, content: str | openvino_genai.py_openvino_genai.StructuredOutputConfig.Regex | openvino_genai.py_openvino_genai.StructuredOutputConfig.JSONSchema | openvino_genai.py_openvino_genai.StructuredOutputConfig.EBNF | openvino_genai.py_openvino_genai.StructuredOutputConfig.ConstString | openvino_genai.py_openvino_genai.StructuredOutputConfig.AnyText | openvino_genai.py_openvino_genai.StructuredOutputConfig.QwenXMLParametersFormat | openvino_genai.py_openvino_genai.StructuredOutputConfig.Concat | openvino_genai.py_openvino_genai.StructuredOutputConfig.Union | openvino_genai.py_openvino_genai.StructuredOutputConfig.Tag | openvino_genai.py_openvino_genai.StructuredOutputConfig.TriggeredTags | openvino_genai.py_openvino_genai.StructuredOutputConfig.TagsWithSeparator, end: StructuredOutputConfig.Token) -> None:
+            ...
+        def __repr__(self) -> str:
+            ...
+    class TokenTriggeredTags:
+        """
+        
+            TokenTriggeredTags dispatches on tokenizer token ids or vocabulary
+            strings instead of plain-text triggers.
+        """
+        at_least_one: bool
+        exclude_tokens: list[int | str]
+        stop_after_first: bool
+        def __add__(self, arg0: typing.Any) -> StructuredOutputConfig.Concat:
+            ...
+        def __init__(self, trigger_tokens: collections.abc.Sequence[int | str], tags: collections.abc.Sequence[StructuredOutputConfig.TokenTag], at_least_one: bool = False, stop_after_first: bool = False) -> None:
+            ...
+        def __or__(self, arg0: typing.Any) -> StructuredOutputConfig.Union:
+            ...
+        def __repr__(self) -> str:
+            ...
+        @property
+        def tags(self) -> list[StructuredOutputConfig.TokenTag]:
+            ...
+        @tags.setter
+        def tags(self, arg0: collections.abc.Sequence[StructuredOutputConfig.TokenTag]) -> None:
+            ...
+        @property
+        def trigger_tokens(self) -> list[int | str]:
             ...
     class TriggeredTags:
         """
