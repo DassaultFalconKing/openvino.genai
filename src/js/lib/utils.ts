@@ -45,10 +45,13 @@ export declare namespace StructuredOutputConfig {
     | ConstString
     | AnyText
     | QwenXMLParametersFormat
+    | Token
+    | AnyTokens
     | Concat
     | Union
     | Tag
     | TriggeredTags
+    | TokenTriggeredTags
     | TagsWithSeparator;
   /** Regex structural tag constrains output using a regular expression. */
   export type Regex = {
@@ -84,6 +87,18 @@ export declare namespace StructuredOutputConfig {
     structuralTagType: "QwenXMLParametersFormat";
     jsonSchema: string;
   };
+  /** Token matches exactly one tokenizer token by id or vocabulary string. */
+  export type Token = {
+    structuralTagType: "Token";
+    token: number | string;
+  };
+  /** AnyTokens matches zero or more tokenizer tokens, optionally excluding
+   * token ids or vocabulary strings and bounding the token count. */
+  export type AnyTokens = {
+    structuralTagType: "AnyTokens";
+    excludeTokens?: (number | string)[];
+    maxTokens?: number;
+  };
   /** Concat composes multiple structural tags in sequence. Each element
    * must be produced in the given order.
    *
@@ -109,6 +124,20 @@ export declare namespace StructuredOutputConfig {
     begin: string;
     content: StructuralTag;
     end: string;
+  };
+  /** TokenTriggeredTags dispatches on tokenizer token ids or vocabulary
+   * strings. Tag begin/end are Token values; XGrammar has no separate TokenTag type. */
+  export type TokenTriggeredTags = {
+    structuralTagType: "TokenTriggeredTags";
+    triggerTokens: (number | string)[];
+    tags: Array<{
+      begin: Token;
+      content: StructuralTag;
+      end: Token;
+    }>;
+    excludeTokens?: (number | string)[];
+    atLeastOne: boolean;
+    stopAfterFirst: boolean;
   };
   /** TriggeredTags associates a set of `triggers` with multiple `tags`.
    *
@@ -187,6 +216,17 @@ export class StructuredOutputConfig {
     return { structuralTagType: "QwenXMLParametersFormat", jsonSchema };
   }
 
+  static Token(token: number | string): StructuredOutputConfig.Token {
+    return { structuralTagType: "Token", token };
+  }
+
+  static AnyTokens(params: {
+    excludeTokens?: (number | string)[];
+    maxTokens?: number;
+  } = {}): StructuredOutputConfig.AnyTokens {
+    return { structuralTagType: "AnyTokens", ...params };
+  }
+
   static Concat(
     ...elements: StructuredOutputConfig.StructuralTag[]
   ): StructuredOutputConfig.Concat {
@@ -203,6 +243,21 @@ export class StructuredOutputConfig {
     end: string;
   }): StructuredOutputConfig.Tag {
     return { structuralTagType: "Tag", ...params };
+  }
+
+  static TokenTriggeredTags(params: {
+    triggerTokens: (number | string)[];
+    tags: StructuredOutputConfig.TokenTriggeredTags["tags"];
+    excludeTokens?: (number | string)[];
+    atLeastOne?: boolean;
+    stopAfterFirst?: boolean;
+  }): StructuredOutputConfig.TokenTriggeredTags {
+    return {
+      structuralTagType: "TokenTriggeredTags",
+      ...params,
+      atLeastOne: params.atLeastOne ?? false,
+      stopAfterFirst: params.stopAfterFirst ?? false,
+    };
   }
 
   static TriggeredTags(params: {
