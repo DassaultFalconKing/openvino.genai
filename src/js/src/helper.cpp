@@ -4,6 +4,7 @@
 #include "include/helper.hpp"
 
 #include <cmath>
+#include <limits>
 #include <typeindex>
 
 #include "include/addon.hpp"
@@ -570,6 +571,62 @@ ov::genai::SchedulerConfig js_to_cpp<ov::genai::SchedulerConfig>(const Napi::Env
     return config;
 }
 
+namespace {
+
+using TokenRef = std::variant<int32_t, std::string>;
+
+TokenRef token_ref_from_js(const Napi::Env& env, const Napi::Value& value, const char* field_name) {
+    if (value.IsString()) {
+        auto text = value.As<Napi::String>().Utf8Value();
+        OPENVINO_ASSERT(!text.empty(), std::string(field_name) + " string must be non-empty");
+        return text;
+    }
+    OPENVINO_ASSERT(value.IsNumber() && is_js_integer(env, value.As<Napi::Number>()),
+                    std::string(field_name) + " must be an integer id or a string");
+    const auto id = value.As<Napi::Number>().DoubleValue();
+    OPENVINO_ASSERT(std::isfinite(id) && id >= 0 && id <= std::numeric_limits<int32_t>::max(),
+                    std::string(field_name) + " id must be in the non-negative int32 range");
+    return static_cast<int32_t>(id);
+}
+
+std::vector<TokenRef> token_ref_list_from_js(const Napi::Env& env, const Napi::Value& value, const char* field_name) {
+    OPENVINO_ASSERT(value.IsArray(), std::string(field_name) + " must be an array");
+    auto array = value.As<Napi::Array>();
+    std::vector<TokenRef> tokens;
+    tokens.reserve(array.Length());
+    for (uint32_t i = 0; i < array.Length(); ++i) {
+        tokens.push_back(token_ref_from_js(env, array.Get(i), field_name));
+    }
+    return tokens;
+}
+
+ov::genai::StructuredOutputConfig::Token token_from_js(const Napi::Env& env, const Napi::Value& value) {
+    OPENVINO_ASSERT(value.IsObject(), "Token must be a JS object");
+    auto obj = value.As<Napi::Object>();
+    const auto token = token_ref_from_js(env, obj.Get("token"), "Token.token");
+    if (const auto* id = std::get_if<int32_t>(&token)) {
+        return ov::genai::StructuredOutputConfig::Token(*id);
+    }
+    return ov::genai::StructuredOutputConfig::Token(std::get<std::string>(token));
+}
+
+Napi::Value token_ref_to_js(const Napi::Env& env, const TokenRef& token) {
+    if (const auto* id = std::get_if<int32_t>(&token)) {
+        return Napi::Number::New(env, *id);
+    }
+    return Napi::String::New(env, std::get<std::string>(token));
+}
+
+Napi::Value token_ref_list_to_js(const Napi::Env& env, const std::vector<TokenRef>& tokens) {
+    Napi::Array array = Napi::Array::New(env, tokens.size());
+    for (uint32_t i = 0; i < tokens.size(); ++i) {
+        array.Set(i, token_ref_to_js(env, tokens[i]));
+    }
+    return array;
+}
+
+}  // namespace
+
 template <>
 ov::genai::StructuredOutputConfig::Tag js_to_cpp<ov::genai::StructuredOutputConfig::Tag>(const Napi::Env& env,
                                                                                          const Napi::Value& value) {
@@ -671,6 +728,53 @@ ov::genai::StructuredOutputConfig::StructuralTag js_to_cpp<ov::genai::Structured
             separator,
             at_least_one.As<Napi::Boolean>().Value(),
             stop_after_first.As<Napi::Boolean>().Value());
+    } else if (tag_type == "Token") {
+        return token_from_js(env, obj);
+    } else if (tag_type == "AnyTokens") {
+        ov::genai::StructuredOutputConfig::AnyTokens any_tokens;
+        if (obj.Has("excludeTokens") && !obj.Get("excludeTokens").IsUndefined()) {
+            any_tokens.exclude_tokens = token_ref_list_from_js(env, obj.Get("excludeTokens"), "excludeTokens");
+        }
+        if (obj.Has("maxTokens") && !obj.Get("maxTokens").IsUndefined() && !obj.Get("maxTokens").IsNull()) {
+            auto max_tokens = obj.Get("maxTokens");
+            OPENVINO_ASSERT(max_tokens.IsNumber() && is_js_integer(env, max_tokens.As<Napi::Number>()),
+                            "AnyTokens maxTokens must be an integer");
+            const auto bound = max_tokens.As<Napi::Number>().DoubleValue();
+            OPENVINO_ASSERT(std::isfinite(bound) && bound >= 0 && bound <= std::numeric_limits<int32_t>::max(),
+                            "AnyTokens maxTokens must be in the non-negative int32 range");
+            any_tokens.max_tokens = static_cast<int32_t>(bound);
+        }
+        return any_tokens;
+    } else if (tag_type == "TokenTriggeredTags") {
+        auto trigger_tokens = token_ref_list_from_js(env, obj.Get("triggerTokens"), "triggerTokens");
+        std::vector<ov::genai::StructuredOutputConfig::TokenTriggeredTags::Tag> tags;
+        auto js_tags = obj.Get("tags");
+        OPENVINO_ASSERT(js_tags.IsArray(), "TokenTriggeredTags tags must be an array");
+        auto js_array = js_tags.As<Napi::Array>();
+        tags.reserve(js_array.Length());
+        for (uint32_t i = 0; i < js_array.Length(); ++i) {
+            OPENVINO_ASSERT(js_array.Get(i).IsObject(), "TokenTriggeredTags tag must be an object");
+            auto tag_obj = js_array.Get(i).As<Napi::Object>();
+            tags.emplace_back(token_from_js(env, tag_obj.Get("begin")),
+                              js_to_cpp<ov::genai::StructuredOutputConfig::StructuralTag>(env, tag_obj.Get("content")),
+                              token_from_js(env, tag_obj.Get("end")));
+        }
+        std::vector<TokenRef> exclude_tokens;
+        if (obj.Has("excludeTokens") && !obj.Get("excludeTokens").IsUndefined()) {
+            exclude_tokens = token_ref_list_from_js(env, obj.Get("excludeTokens"), "excludeTokens");
+        }
+        bool at_least_one = false;
+        bool stop_after_first = false;
+        if (obj.Has("atLeastOne") && !obj.Get("atLeastOne").IsUndefined()) {
+            OPENVINO_ASSERT(obj.Get("atLeastOne").IsBoolean(), "TokenTriggeredTags atLeastOne must be a boolean");
+            at_least_one = obj.Get("atLeastOne").As<Napi::Boolean>().Value();
+        }
+        if (obj.Has("stopAfterFirst") && !obj.Get("stopAfterFirst").IsUndefined()) {
+            OPENVINO_ASSERT(obj.Get("stopAfterFirst").IsBoolean(), "TokenTriggeredTags stopAfterFirst must be a boolean");
+            stop_after_first = obj.Get("stopAfterFirst").As<Napi::Boolean>().Value();
+        }
+        return std::make_shared<ov::genai::StructuredOutputConfig::TokenTriggeredTags>(
+            std::move(trigger_tokens), std::move(tags), std::move(exclude_tokens), at_least_one, stop_after_first);
     } else {
         OPENVINO_THROW("Unknown StructuralTag type: " + tag_type);
     }
@@ -1396,6 +1500,45 @@ Napi::Value cpp_to_js<ov::genai::StructuredOutputConfig::StructuralTag, Napi::Va
                        }
                        obj.Set("tags", tags_arr);
                        obj.Set("separator", Napi::String::New(env, g->separator));
+                       obj.Set("atLeastOne", Napi::Boolean::New(env, g->at_least_one));
+                       obj.Set("stopAfterFirst", Napi::Boolean::New(env, g->stop_after_first));
+                       return obj;
+                   },
+                   [&env](const SOC::Token& g) -> Napi::Value {
+                       Napi::Object obj = Napi::Object::New(env);
+                       obj.Set("structuralTagType", Napi::String::New(env, "Token"));
+                       obj.Set("token", token_ref_to_js(env, g.token));
+                       return obj;
+                   },
+                   [&env](const SOC::AnyTokens& g) -> Napi::Value {
+                       Napi::Object obj = Napi::Object::New(env);
+                       obj.Set("structuralTagType", Napi::String::New(env, "AnyTokens"));
+                       obj.Set("excludeTokens", token_ref_list_to_js(env, g.exclude_tokens));
+                       if (g.max_tokens.has_value()) {
+                           obj.Set("maxTokens", Napi::Number::New(env, *g.max_tokens));
+                       }
+                       return obj;
+                   },
+                   [&env](const std::shared_ptr<SOC::TokenTriggeredTags>& g) -> Napi::Value {
+                       Napi::Object obj = Napi::Object::New(env);
+                       obj.Set("structuralTagType", Napi::String::New(env, "TokenTriggeredTags"));
+                       obj.Set("triggerTokens", token_ref_list_to_js(env, g->trigger_tokens));
+                       Napi::Array tags_arr = Napi::Array::New(env, g->tags.size());
+                       for (uint32_t i = 0; i < g->tags.size(); ++i) {
+                           Napi::Object tag_obj = Napi::Object::New(env);
+                           Napi::Object begin = Napi::Object::New(env);
+                           begin.Set("structuralTagType", Napi::String::New(env, "Token"));
+                           begin.Set("token", token_ref_to_js(env, g->tags[i].begin.token));
+                           Napi::Object end = Napi::Object::New(env);
+                           end.Set("structuralTagType", Napi::String::New(env, "Token"));
+                           end.Set("token", token_ref_to_js(env, g->tags[i].end.token));
+                           tag_obj.Set("begin", begin);
+                           tag_obj.Set("content", cpp_to_js<SOC::StructuralTag, Napi::Value>(env, g->tags[i].content));
+                           tag_obj.Set("end", end);
+                           tags_arr.Set(i, tag_obj);
+                       }
+                       obj.Set("tags", tags_arr);
+                       obj.Set("excludeTokens", token_ref_list_to_js(env, g->exclude_tokens));
                        obj.Set("atLeastOne", Napi::Boolean::New(env, g->at_least_one));
                        obj.Set("stopAfterFirst", Napi::Boolean::New(env, g->stop_after_first));
                        return obj;

@@ -663,6 +663,12 @@ StructuredOutputConfig::StructuralTag py_obj_to_structural_tag(const py::object&
         return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::TriggeredTags>>(py_obj);
     } else if (py::isinstance<ov::genai::StructuredOutputConfig::TagsWithSeparator>(py_obj)) {
         return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::TagsWithSeparator>>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::Token>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::Token>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::AnyTokens>(py_obj)) {
+        return py::cast<ov::genai::StructuredOutputConfig::AnyTokens>(py_obj);
+    } else if (py::isinstance<ov::genai::StructuredOutputConfig::TokenTriggeredTags>(py_obj)) {
+        return py::cast<std::shared_ptr<ov::genai::StructuredOutputConfig::TokenTriggeredTags>>(py_obj);
     } else {
         OPENVINO_THROW(py_obj.get_type(), " type isn't supported for StructuralTag: ", py::str(py_obj));
     }

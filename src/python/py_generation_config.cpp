@@ -309,6 +309,58 @@ void init_generation_config(py::module_& m) {
         .def("__repr__", [](const StructuredOutputConfig::QwenXMLParametersFormat& self) { return self.to_string(); });
     add_grammar_operators(qwen_xml);
 
+    auto token = py::class_<StructuredOutputConfig::Token>(structured_output_config, "Token")
+        .def(py::init<int32_t>(), py::arg("token"))
+        .def(py::init<std::string>(), py::arg("token"))
+        .def_readwrite("token", &StructuredOutputConfig::Token::token)
+        .def("__repr__", [](const StructuredOutputConfig::Token& self) { return self.to_string(); });
+    add_grammar_operators(token);
+
+    auto any_tokens = py::class_<StructuredOutputConfig::AnyTokens>(structured_output_config, "AnyTokens")
+        .def(py::init<std::vector<std::variant<int32_t, std::string>>, std::optional<int32_t>>(),
+             py::arg("exclude_tokens") = std::vector<std::variant<int32_t, std::string>>{},
+             py::arg("max_tokens") = std::nullopt)
+        .def_readwrite("exclude_tokens", &StructuredOutputConfig::AnyTokens::exclude_tokens)
+        .def_readwrite("max_tokens", &StructuredOutputConfig::AnyTokens::max_tokens)
+        .def("__repr__", [](const StructuredOutputConfig::AnyTokens& self) { return self.to_string(); });
+    add_grammar_operators(any_tokens);
+
+    auto token_triggered_tags = py::class_<StructuredOutputConfig::TokenTriggeredTags,
+                                           std::shared_ptr<StructuredOutputConfig::TokenTriggeredTags>>(
+        structured_output_config, "TokenTriggeredTags");
+    py::class_<StructuredOutputConfig::TokenTriggeredTags::Tag>(token_triggered_tags, "Tag")
+        .def(py::init<StructuredOutputConfig::Token, StructuredOutputConfig::StructuralTag, StructuredOutputConfig::Token>(),
+             py::arg("begin"), py::arg("content"), py::arg("end"))
+        .def_readwrite("begin", &StructuredOutputConfig::TokenTriggeredTags::Tag::begin)
+        .def_readwrite("content", &StructuredOutputConfig::TokenTriggeredTags::Tag::content)
+        .def_readwrite("end", &StructuredOutputConfig::TokenTriggeredTags::Tag::end)
+        .def("__repr__", [](const StructuredOutputConfig::TokenTriggeredTags::Tag& self) { return self.to_string(); });
+    token_triggered_tags
+        .def(py::init([](std::vector<std::variant<int32_t, std::string>> trigger_tokens,
+                         std::vector<StructuredOutputConfig::TokenTriggeredTags::Tag> tags,
+                         std::vector<std::variant<int32_t, std::string>> exclude_tokens,
+                         bool at_least_one,
+                         bool stop_after_first) {
+                 return std::make_shared<StructuredOutputConfig::TokenTriggeredTags>(
+                     std::move(trigger_tokens),
+                     std::move(tags),
+                     std::move(exclude_tokens),
+                     at_least_one,
+                     stop_after_first);
+             }),
+             py::arg("trigger_tokens"),
+             py::arg("tags"),
+             py::arg("exclude_tokens") = std::vector<std::variant<int32_t, std::string>>{},
+             py::arg("at_least_one") = false,
+             py::arg("stop_after_first") = false)
+        .def_readwrite("trigger_tokens", &StructuredOutputConfig::TokenTriggeredTags::trigger_tokens)
+        .def_readwrite("tags", &StructuredOutputConfig::TokenTriggeredTags::tags)
+        .def_readwrite("exclude_tokens", &StructuredOutputConfig::TokenTriggeredTags::exclude_tokens)
+        .def_readwrite("at_least_one", &StructuredOutputConfig::TokenTriggeredTags::at_least_one)
+        .def_readwrite("stop_after_first", &StructuredOutputConfig::TokenTriggeredTags::stop_after_first)
+        .def("__repr__", [](const StructuredOutputConfig::TokenTriggeredTags& self) { return self.to_string(); });
+    add_grammar_operators(token_triggered_tags);
+
     concat
         .def(py::init([](py::iterable elements) {
             return std::make_shared<StructuredOutputConfig::Concat>(
@@ -399,10 +451,13 @@ void init_generation_config(py::module_& m) {
                            || py::isinstance<StructuredOutputConfig::Concat>(value)
                            || py::isinstance<StructuredOutputConfig::Tag>(value)
                            || py::isinstance<StructuredOutputConfig::TriggeredTags>(value)
-                           || py::isinstance<StructuredOutputConfig::TagsWithSeparator>(value)) {
+                           || py::isinstance<StructuredOutputConfig::TagsWithSeparator>(value)
+                           || py::isinstance<StructuredOutputConfig::Token>(value)
+                           || py::isinstance<StructuredOutputConfig::AnyTokens>(value)
+                           || py::isinstance<StructuredOutputConfig::TokenTriggeredTags>(value)) {
                     self.structural_tags_config = pyutils::py_obj_to_structural_tag(value);
                 } else {
-                    throw py::type_error("structural_tags_config must be either StructuralTagsConfig or a StructuralTag (Regex, JSONSchema, EBNF, ConstString, AnyText, QwenXMLParametersFormat, Union, Concat, Tag, TriggeredTags, TagsWithSeparator or plain str)");
+                    throw py::type_error("structural_tags_config must be either StructuralTagsConfig or a StructuralTag (Regex, JSONSchema, EBNF, ConstString, AnyText, QwenXMLParametersFormat, Union, Concat, Tag, TriggeredTags, TagsWithSeparator, Token, AnyTokens, TokenTriggeredTags or plain str)");
                 }
             },
             "Configuration for structural tags in structured output generation (can be StructuralTagsConfig or StructuralTag)")
