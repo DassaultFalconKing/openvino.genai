@@ -69,6 +69,7 @@ public:
      * @param vocab_size Optional vocabulary size; if not provided, it will be determined from the tokenizer.
      */
     XGrammarStructuredOutput(const ov::genai::Tokenizer::TokenizerImpl& tokenizer_impl, std::optional<int> vocab_size = std::nullopt);
+    XGrammarStructuredOutput(std::vector<std::string> vocab, int64_t eos_token_id, std::optional<int> vocab_size = std::nullopt);
 
     /**
      * @brief Returns a logit transformer that applies XGrammar grammar matching to logits.
@@ -83,9 +84,11 @@ public:
     std::shared_ptr<LogitTransformers::ILogitTransformer> get_logits_transformer(const ov::genai::GenerationConfig& sampling_parameters) override;
     void validate_grammar(const std::optional<StructuredOutputConfig>& structured_output_config) override;
 private:
+    std::optional<xgrammar::TokenizerInfo> m_tokenizer_info;
     std::unique_ptr<xgrammar::GrammarCompiler> m_grammar_compiler;
 
-    static xgrammar::Grammar parse_structural_tag(const StructuredOutputConfig::CompoundGrammar& compound_grammar);
+    void init_compiler(std::vector<std::string> vocab, int64_t eos_token_id, std::optional<int> vocab_size);
+    xgrammar::Grammar parse_structural_tag(const StructuredOutputConfig::CompoundGrammar& compound_grammar);
     xgrammar::Grammar create_grammar(const std::optional<StructuredOutputConfig>& structured_output_config);
 };
 
