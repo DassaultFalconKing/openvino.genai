@@ -113,7 +113,7 @@ if(NOT TARGET minja)
     FetchContent_Declare(
         minja
         GIT_REPOSITORY https://github.com/google/minja.git
-        GIT_TAG 3e4c61c616eda133cfb1e440fc7a14bf1729bbee
+        GIT_TAG 021c2293c187789ef13d56c6cfd89c9b134fd80f
     )
 
     FetchContent_GetProperties(minja)
@@ -152,7 +152,7 @@ if(ANDROID)
 endif()
 
 if(ENABLE_XGRAMMAR)
-    set(XGRAMMAR_VERSION 7e269d56c74c89de52bc8c31e42191155416371f)
+    set(XGRAMMAR_VERSION 614ab01d2af3fdfdde73ae3e4171a7f36db45c23)
     set(XGRAMMAR_DIR ${CMAKE_BINARY_DIR}/xgrammar)
 
     FetchContent_Declare(
@@ -167,20 +167,8 @@ if(ENABLE_XGRAMMAR)
     if(NOT xgrammar_POPULATED)
         FetchContent_Populate(xgrammar)
 
-        # Modify the config.cmake file directly
-        set(CONFIG_FILE "${xgrammar_SOURCE_DIR}/cmake/config.cmake")
-        if(EXISTS "${CONFIG_FILE}")
-            file(READ "${CONFIG_FILE}" CONFIG_CONTENT)
-            string(REGEX REPLACE "XGRAMMAR_BUILD_PYTHON_BINDINGS ON"
-                                "XGRAMMAR_BUILD_PYTHON_BINDINGS OFF"
-                                MODIFIED_CONFIG "${CONFIG_CONTENT}")
-
-            string(REGEX REPLACE "^set\\(CMAKE_BUILD_TYPE .*$"
-                                "set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE})"
-                                MODIFIED_CONFIG "${MODIFIED_CONFIG}")
-            file(WRITE "${CONFIG_FILE}" "${MODIFIED_CONFIG}")
-        endif()
-
+        # XGrammar's cache options are honored by its default config. Keep the
+        # fetched source pristine so the same checkout can serve other builds.
         set(XGRAMMAR_BUILD_CXX_TESTS OFF CACHE BOOL "Build CXX tests" FORCE)
         set(XGRAMMAR_ENABLE_CPPTRACE OFF CACHE BOOL "Enable CPPTrace" FORCE)
         set(XGRAMMAR_ENABLE_CUDA OFF CACHE BOOL "Enable CUDA" FORCE)
