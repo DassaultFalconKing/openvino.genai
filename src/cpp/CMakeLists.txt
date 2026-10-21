@@ -152,12 +152,15 @@ if(ANDROID)
 endif()
 
 if(ENABLE_XGRAMMAR)
-    set(XGRAMMAR_VERSION 614ab01d2af3fdfdde73ae3e4171a7f36db45c23)
+    # Fork cohort: locked c77d5e0 (empty ExcludeToken + cache options) plus
+    # #802 epsilon/R1 at b288dca. Does not include XML #650. Upstream base
+    # remains 614ab01. FETCHCONTENT_SOURCE_DIR_XGRAMMAR still overrides this.
+    set(XGRAMMAR_VERSION b288dca18ee25d2f35197fb3971334ca049c8554)
     set(XGRAMMAR_DIR ${CMAKE_BINARY_DIR}/xgrammar)
 
     FetchContent_Declare(
       xgrammar
-      GIT_REPOSITORY https://github.com/mlc-ai/xgrammar.git
+      GIT_REPOSITORY https://github.com/DassaultFalconKing/xgrammar.git
       GIT_TAG ${XGRAMMAR_VERSION}
       GIT_SUBMODULES_RECURSE ON
     )
