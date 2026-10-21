@@ -152,10 +152,11 @@ if(ANDROID)
 endif()
 
 if(ENABLE_XGRAMMAR)
-    # Fork cohort: locked c77d5e0 (empty ExcludeToken + cache options) plus
-    # #802 epsilon/R1 at b288dca. Does not include XML #650. Upstream base
-    # remains 614ab01. FETCHCONTENT_SOURCE_DIR_XGRAMMAR still overrides this.
-    set(XGRAMMAR_VERSION b288dca18ee25d2f35197fb3971334ca049c8554)
+    # Fork cohort: locked c77d5e0 (empty ExcludeToken + cache options), #802
+    # epsilon/R1 at b288dca, then the XML #650 end-marker lock at 5b0b708.
+    # Source pin only: not compiled here and not a runtime or lock acceptance.
+    # Upstream base remains 614ab01. FETCHCONTENT_SOURCE_DIR_XGRAMMAR still overrides this.
+    set(XGRAMMAR_VERSION 5b0b7084a65a2059b44c03fbc6320ad7fcc41f33)
     set(XGRAMMAR_DIR ${CMAKE_BINARY_DIR}/xgrammar)
 
     FetchContent_Declare(
