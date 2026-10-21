@@ -48,8 +48,8 @@ git -C xgrammar checkout --detach c77d5e0d62411d17d4cf55d280463eb5b3bec7ba
 git -C xgrammar submodule update --init --recursive
 git clone --single-branch --branch codex/c6-head-20261019-minja-locked https://github.com/DassaultFalconKing/minja.git minja
 git -C minja checkout --detach 83eb074e42140b0d1194d1dd61f29c31e4515ee9
-$patchedXGrammar=(Resolve-Path .\xgrammar).Path.Replace('\\','/')
-$patchedMinja=(Resolve-Path .\minja).Path.Replace('\\','/')
+$patchedXGrammar=(Resolve-Path .\xgrammar).Path.Replace([char]92,[char]47)
+$patchedMinja=(Resolve-Path .\minja).Path.Replace([char]92,[char]47)
 ```
 
 Add these arguments to the GenAI configure invocation, alongside the normal
